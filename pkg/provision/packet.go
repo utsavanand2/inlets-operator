@@ -61,6 +61,7 @@ func (p *PacketProvisioner) Provision(host BasicHost) (*ProvisionedHost, error) 
 		OS:           host.OS,
 		BillingCycle: "hourly",
 		UserData:     host.UserData,
+		Tags:         []string{"inlets", "inlets-operator"},
 	}
 
 	device, _, err := p.client.Devices.Create(createReq)

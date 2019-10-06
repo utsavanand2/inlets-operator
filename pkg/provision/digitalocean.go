@@ -73,6 +73,7 @@ func (p *DigitalOceanProvisioner) Provision(host BasicHost) (*ProvisionedHost, e
 			Slug: host.OS,
 		},
 		UserData: host.UserData,
+		Tags:     []string{"inlets", "inlets-operator"},
 	}
 
 	droplet, _, err := p.client.Droplets.Create(context.Background(), createReq)
