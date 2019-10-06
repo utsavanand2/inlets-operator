@@ -121,6 +121,22 @@ func NewController(
 		DeleteFunc: func(old interface{}) {
 			r, ok := checkCustomResourceType(old)
 			if ok {
+
+				opts := metav1.GetOptions{}
+
+				deploy, err := kubeclientset.AppsV1().Deployments(r.Namespace).Get(r.Name+clientSuffix, opts)
+				if err == nil && deploy != nil {
+					deleteOpts := &metav1.DeleteOptions{}
+
+					log.Printf("Deleting inlets client: %s.%s\n", deploy.Name, deploy.Namespace)
+
+					deleteErr := kubeclientset.AppsV1().Deployments(r.Namespace).Delete(r.Name+clientSuffix, deleteOpts)
+					if deleteErr != nil {
+						log.Printf("Error deleting deployment: %s.%s, %s\n",
+							deploy.Name, deploy.Namespace, deleteErr)
+					}
+				}
+
 				if len(r.Status.HostID) > 0 {
 					var provisioner provision.Provisioner
 
@@ -322,7 +338,7 @@ func (c *Controller) syncHandler(key string) error {
 			}
 
 			if errors.IsNotFound(err) {
-				fmt.Printf("Creating Tunnel %s.%s\n", name, namespace)
+				log.Printf("Creating Tunnel %s.%s\n", name, namespace)
 
 				tunnel := &inletsv1alpha1.Tunnel{
 					Spec: inletsv1alpha1.TunnelSpec{
