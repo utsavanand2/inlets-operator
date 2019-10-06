@@ -35,8 +35,9 @@ import (
 	listers "github.com/alexellis/inlets-operator/pkg/generated/listers/inletsoperator/v1alpha1"
 )
 
-const controllerAgentName = "sample-controller"
+const controllerAgentName = "inlets-operator"
 const inletsControlPort = 8080
+const clientSuffix = "-inlets"
 
 const (
 	// SuccessSynced is used as part of the Event 'reason' when a Tunnel is synced
@@ -133,7 +134,9 @@ func NewController(
 					}
 
 					if provisioner != nil {
-						log.Printf("Deleting exit-node: %s, ip: %s\n", r.Status.HostID, r.Status.HostIP)
+						log.Printf("Deleting exit-node: %s, ip: %s, tunnel: %s.%s\n",
+							r.Status.HostID, r.Status.HostIP, r.Name, r.Namespace)
+
 						err := provisioner.Delete(r.Status.HostID)
 						if err != nil {
 							log.Println(err)
@@ -309,7 +312,8 @@ func (c *Controller) syncHandler(key string) error {
 
 			tunnels := c.operatorclientset.InletsoperatorV1alpha1().Tunnels(service.ObjectMeta.Namespace)
 			ops := metav1.GetOptions{}
-			name := service.Name + "-tunnel"
+			name := service.Name
+
 			found, err := tunnels.Get(name, ops)
 
 			pwdRes, pwdErr := password.Generate(64, 10, 0, false, true)
@@ -318,7 +322,8 @@ func (c *Controller) syncHandler(key string) error {
 			}
 
 			if errors.IsNotFound(err) {
-				fmt.Printf("Creating tunnel %s\n", name)
+				fmt.Printf("Creating Tunnel %s.%s\n", name, namespace)
+
 				tunnel := &inletsv1alpha1.Tunnel{
 					Spec: inletsv1alpha1.TunnelSpec{
 						ServiceName: service.Name,
@@ -340,11 +345,11 @@ func (c *Controller) syncHandler(key string) error {
 				_, err := tunnels.Create(tunnel)
 
 				if err != nil {
-					log.Printf("Error creating tunnel: %s", err.Error())
+					log.Printf("Error creating tunnel: %s.%s\n", err.Error(), service.Namespace)
 				}
 
 			} else {
-				log.Printf("Tunnel exists: %s\n", found.Name)
+				log.Printf("Tunnel exists: %s.%s\n", found.Name, found.Namespace)
 			}
 
 		}
@@ -374,7 +379,7 @@ func (c *Controller) syncHandler(key string) error {
 			provisioner, _ := provision.NewPacketProvisioner(c.infraConfig.GetAccessKey())
 
 			res, err := provisioner.Provision(provision.BasicHost{
-				Name:     tunnel.Name,
+				Name:     tunnel.Name + "-inlets",
 				OS:       "ubuntu_16_04",
 				Plan:     "t1.small.x86",
 				Region:   c.infraConfig.Region,
@@ -438,20 +443,20 @@ func (c *Controller) syncHandler(key string) error {
 			}
 
 			if host.Status == "active" {
-				log.Println("Device is now active")
+				log.Println("Device %s is now active", host.ID)
 
 				err := c.updateTunnelProvisioningStatus(tunnel, "active", host.ID, host.IP)
 				if err != nil {
-					log.Printf("Error updating tunnel status: %s, %s", tunnel.Name, err.Error())
+					log.Printf("Error updating tunnel: %s.%s, %s\n", tunnel.Name, tunnel.Namespace, err.Error())
 				}
 
 				err = c.updateService(tunnel, host.IP)
 				if err != nil {
-					log.Printf("Error updating service: %s, %s", tunnel.Spec.ServiceName, err.Error())
+					log.Printf("Error updating service: %s.%s, %s\n", tunnel.Name, tunnel.Namespace, err.Error())
 				}
 
 			} else {
-				log.Printf("Still provisioning: %s\n", tunnel.Name)
+				log.Printf("Still provisioning: %s.%s\n", tunnel.Name, tunnel.Namespace)
 			}
 
 		} else if c.infraConfig.Provider == "digitalocean" {
@@ -472,7 +477,7 @@ func (c *Controller) syncHandler(key string) error {
 
 					err = c.updateService(tunnel, host.IP)
 					if err != nil {
-						log.Printf("Error updating service: %s, %s", tunnel.Spec.ServiceName, err.Error())
+						log.Printf("Error updating service: %s.%s, %s", tunnel.Name, tunnel.Namespace, err.Error())
 					}
 				}
 			}
@@ -504,7 +509,10 @@ func (c *Controller) syncHandler(key string) error {
 
 			if createDeployErr != nil {
 				log.Println(createDeployErr)
+				return createDeployErr
 			}
+
+			log.Printf("Inlets client deployed: %s.%s\n", deployment.Name, deployment.Namespace)
 
 			tunnel.Spec.ClientDeploymentRef = &metav1.ObjectMeta{
 				Name:      deployment.Name,
@@ -536,7 +544,7 @@ func (c *Controller) syncHandler(key string) error {
 
 func makeClient(tunnel *inletsv1alpha1.Tunnel, targetPort int32, clientImage string) *appsv1.Deployment {
 	replicas := int32(1)
-	name := tunnel.Name + "-client"
+	name := tunnel.Name + clientSuffix
 
 	deployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -566,7 +574,7 @@ func makeClient(tunnel *inletsv1alpha1.Tunnel, targetPort int32, clientImage str
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:            "client",
+							Name:            "inlets",
 							Image:           clientImage,
 							Command:         []string{"inlets"},
 							ImagePullPolicy: corev1.PullIfNotPresent,
@@ -595,9 +603,6 @@ func (c *Controller) updateService(tunnel *inletsv1alpha1.Tunnel, ip string) err
 	}
 
 	copy := res.DeepCopy()
-	// copy.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{
-	// 	corev1.LoadBalancerIngress{IP: ip},
-	// }
 	copy.Spec.ExternalIPs = []string{ip}
 
 	_, err = c.kubeclientset.CoreV1().Services(tunnel.Namespace).Update(copy)
@@ -605,7 +610,7 @@ func (c *Controller) updateService(tunnel *inletsv1alpha1.Tunnel, ip string) err
 }
 
 func (c *Controller) updateTunnelProvisioningStatus(tunnel *inletsv1alpha1.Tunnel, status, id, ip string) error {
-	log.Printf("Status: %s, ID: %s, IP: %s\n", status, id, ip)
+	log.Printf("Tunnel %s.%s: %s, ID: %s, IP: %s\n", tunnel.Name, tunnel.Namespace, status, id, ip)
 
 	tunnelCopy := tunnel.DeepCopy()
 	tunnelCopy.Status.HostStatus = status

@@ -66,6 +66,7 @@ You can also run the operator in-cluster, a ClusterRole is used since Services c
 # Create a secret to store the access token
 
 kubectl create secret generic inlets-access-key \
+  -n kube-system \
   --from-literal inlets-access-key="$(cat ~/Downloads/do-access-token)"
 
 # Apply the operator deployment and RBAC role
@@ -81,6 +82,7 @@ To get a LoadBalancer for services running on your Raspberry Pi, use the armhf d
 # Create a secret to store the access token
 
 kubectl create secret generic inlets-access-key \
+  -n kube-system \
   --from-literal inlets-access-key="$(cat ~/Downloads/do-access-token)"
 
 # Apply the operator deployment and RBAC role
@@ -129,7 +131,7 @@ go build && ./inlets-operator  --kubeconfig "$(kind get kubeconfig-path --name="
 # Monitor/view logs
 
 ```sh
-kubectl logs deploy/inlets-operator -f
+kubectl logs -n kube-system deploy/inlets-operator -f
 ```
 
 ## Get a LoadBalancer provided by inlets

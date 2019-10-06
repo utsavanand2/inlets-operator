@@ -3,6 +3,7 @@ apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: inlets-operator
+  namespace: kube-system
 spec:
   replicas: 1
   selector:
@@ -18,7 +19,7 @@ spec:
       serviceAccountName: inlets-operator
       containers:
       - name: operator
-        image: alexellis/inlets-operator:0.2.6
+        image: alexellis/inlets-operator:0.2.7-rc1
         imagePullPolicy: Always
         command:
           - ./inlets-operator

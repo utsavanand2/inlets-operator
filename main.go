@@ -76,6 +76,7 @@ func (i *InfraConfig) GetAccessKey() string {
 
 func main() {
 	infra := &InfraConfig{}
+
 	flag.StringVar(&infra.Provider, "provider", "packet", "Your infrastructure provider - 'packet' or 'digitalocean'")
 	flag.StringVar(&infra.Region, "region", "", "The region to provision hosts into")
 	flag.StringVar(&infra.AccessKey, "access-key", "", "The access key for your infrastructure provider")
@@ -87,7 +88,8 @@ func main() {
 
 	infra.InletsClientImage = os.Getenv("client_image")
 
-	log.Printf("Inlets client: %s\n", infra.GetInletsClientImage())
+	log.Printf("Provider: %s\n", infra.Provider)
+	log.Printf("Inlets client image: %s\n", infra.GetInletsClientImage())
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
