@@ -69,6 +69,8 @@ kubectl create secret generic inlets-access-key \
   -n kube-system \
   --from-literal inlets-access-key="$(cat ~/Downloads/do-access-token)"
 
+kubectl apply -f ./aritifacts/crd.yaml
+
 # Apply the operator deployment and RBAC role
 kubectl apply -f ./artifacts/operator-rbac.yaml
 kubectl apply -f ./artifacts/operator-amd64.yaml
@@ -85,6 +87,8 @@ kubectl create secret generic inlets-access-key \
   -n kube-system \
   --from-literal inlets-access-key="$(cat ~/Downloads/do-access-token)"
 
+kubectl apply -f ./aritifacts/crd.yaml
+
 # Apply the operator deployment and RBAC role
 kubectl apply -f ./artifacts/operator-rbac.yaml
 kubectl apply -f ./artifacts/operator-armhf.yaml
@@ -97,7 +101,7 @@ Assuming you're running a local cluster with [KinD](https://github.com/kubernete
 Sign up to [Packet.com](https://packet.com) and get an access key, save it in `~/packet-token`
 
 ```sh
-kubectl apply ./aritifacts/crd.yaml
+kubectl apply -f ./aritifacts/crd.yaml
 
 export PACKET_PROJECT_ID=""	# Populate from dashboard
 
@@ -117,7 +121,7 @@ Assuming you're running a local cluster with [KinD](https://github.com/kubernete
 Sign up to [DigitalOcean.com](https://DigitalOcean.com) and get an access key, save it in `~/do-access-token`.
 
 ```sh
-kubectl apply ./aritifacts/crd.yaml
+kubectl apply -f ./aritifacts/crd.yaml
 
 export GOPATH=$HOME/go/
 go get -u github.com/alexellis/inlets-operator
